@@ -1,0 +1,72 @@
+agents:
+  crop_recommender:
+    model: "gpt-4"
+    temperature: 0.3
+    max_tokens: 1000
+    system_prompt: "You are an expert agricultural advisor specializing in crop recommendations based on soil, weather, and market conditions."
+    
+  soil_analyzer:
+    supported_formats: ["json", "csv", "xml"]
+    nutrient_thresholds:
+      nitrogen: {low: 0.02, medium: 0.05, high: 0.08}
+      phosphorus: {low: 10, medium: 25, high: 40}
+      potassium: {low: 100, medium: 200, high: 300}
+      ph: {acidic: 6.0, neutral: 7.0, alkaline: 8.0}
+    
+  disease_detector:
+    model_path: "models/disease_model.pt"
+    confidence_threshold: 0.75
+    supported_crops: ["tomato", "potato", "corn", "wheat", "rice", "cotton"]
+    image_size: [224, 224]
+    
+  irrigation_advisor:
+    weather_forecast_days: 7
+    soil_moisture_threshold: 0.3
+    crop_water_requirements:
+      rice: 1200  # mm per season
+      wheat: 450
+      corn: 600
+      cotton: 700
+      tomato: 400
+      potato: 350
+    
+  market_forecaster:
+    api_endpoints:
+      agmarknet: "https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070"
+      backup_csv: "data/fallback_prices.csv"
+    price_trend_days: 30
+    supported_markets: ["delhi", "mumbai", "kolkata", "chennai", "bangalore"]
+    
+  yield_predictor:
+    model_path: "models/yield_predictor.pkl"
+    features: ["ndvi", "temperature", "rainfall", "soil_ph", "nitrogen", "phosphorus"]
+    prediction_horizon_days: 90
+    
+  voice_interface:
+    whisper_model: "base"
+    supported_languages: ["en", "hi"]
+    confidence_threshold: 0.8
+    max_audio_duration: 60  # seconds
+
+data_sources:
+  weather:
+    primary: "openweather"
+    backup: "nasa_power"
+    cache_duration: 3600  # seconds
+    
+  satellite:
+    ndvi_resolution: 10  # meters
+    cloud_coverage_threshold: 20  # percent
+    
+  soil:
+    sample_data_path: "data/mock_soil_reports/"
+    
+database:
+  connection_pool_size: 10
+  query_timeout: 30
+  spatial_srid: 4326  # WGS84
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/agribotx.log"
