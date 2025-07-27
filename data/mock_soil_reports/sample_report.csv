@@ -1,0 +1,19 @@
+parameter,value,unit,status
+ph_level,6.8,pH,optimal
+nitrogen,0.045,percent,good
+phosphorus,22.5,ppm,adequate
+potassium,180.0,ppm,good
+organic_matter,2.8,percent,fair
+moisture_content,15.2,percent,adequate
+sulfur,12.5,ppm,adequate
+zinc,0.8,ppm,adequate
+iron,4.2,ppm,good
+manganese,2.1,ppm,adequate
+copper,0.3,ppm,adequate
+boron,0.5,ppm,adequate
+electrical_conductivity,0.4,dS/m,normal
+cation_exchange_capacity,18.5,cmol/kg,good
+farm_id,sample_farm_001,,
+lab_name,Agricultural Testing Lab Delhi,,
+report_date,2024-01-15,,
+soil_texture,loamy,,

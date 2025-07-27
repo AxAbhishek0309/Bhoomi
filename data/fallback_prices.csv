@@ -1,0 +1,36 @@
+crop_name,market_name,state,min_price,max_price,modal_price,price_date,unit
+wheat,Delhi Mandi,Delhi,1800,2200,2000,2024-01-15,quintal
+wheat,Mumbai Mandi,Maharashtra,1850,2250,2050,2024-01-15,quintal
+wheat,Kolkata Mandi,West Bengal,1750,2150,1950,2024-01-15,quintal
+wheat,Chennai Mandi,Tamil Nadu,1900,2300,2100,2024-01-15,quintal
+wheat,Bangalore Mandi,Karnataka,1825,2225,2025,2024-01-15,quintal
+rice,Delhi Mandi,Delhi,2200,2800,2500,2024-01-15,quintal
+rice,Mumbai Mandi,Maharashtra,2300,2900,2600,2024-01-15,quintal
+rice,Kolkata Mandi,West Bengal,2100,2700,2400,2024-01-15,quintal
+rice,Chennai Mandi,Tamil Nadu,2250,2850,2550,2024-01-15,quintal
+rice,Bangalore Mandi,Karnataka,2150,2750,2450,2024-01-15,quintal
+tomato,Delhi Mandi,Delhi,800,1200,1000,2024-01-15,quintal
+tomato,Mumbai Mandi,Maharashtra,900,1300,1100,2024-01-15,quintal
+tomato,Kolkata Mandi,West Bengal,750,1150,950,2024-01-15,quintal
+tomato,Chennai Mandi,Tamil Nadu,850,1250,1050,2024-01-15,quintal
+tomato,Bangalore Mandi,Karnataka,825,1225,1025,2024-01-15,quintal
+onion,Delhi Mandi,Delhi,1200,1600,1400,2024-01-15,quintal
+onion,Mumbai Mandi,Maharashtra,1300,1700,1500,2024-01-15,quintal
+onion,Kolkata Mandi,West Bengal,1150,1550,1350,2024-01-15,quintal
+onion,Chennai Mandi,Tamil Nadu,1250,1650,1450,2024-01-15,quintal
+onion,Bangalore Mandi,Karnataka,1225,1625,1425,2024-01-15,quintal
+potato,Delhi Mandi,Delhi,600,900,750,2024-01-15,quintal
+potato,Mumbai Mandi,Maharashtra,650,950,800,2024-01-15,quintal
+potato,Kolkata Mandi,West Bengal,550,850,700,2024-01-15,quintal
+potato,Chennai Mandi,Tamil Nadu,625,925,775,2024-01-15,quintal
+potato,Bangalore Mandi,Karnataka,575,875,725,2024-01-15,quintal
+cotton,Delhi Mandi,Delhi,5500,6500,6000,2024-01-15,quintal
+cotton,Mumbai Mandi,Maharashtra,5600,6600,6100,2024-01-15,quintal
+cotton,Kolkata Mandi,West Bengal,5400,6400,5900,2024-01-15,quintal
+cotton,Chennai Mandi,Tamil Nadu,5550,6550,6050,2024-01-15,quintal
+cotton,Bangalore Mandi,Karnataka,5475,6475,5975,2024-01-15,quintal
+sugarcane,Delhi Mandi,Delhi,280,320,300,2024-01-15,quintal
+sugarcane,Mumbai Mandi,Maharashtra,290,330,310,2024-01-15,quintal
+sugarcane,Kolkata Mandi,West Bengal,270,310,290,2024-01-15,quintal
+sugarcane,Chennai Mandi,Tamil Nadu,285,325,305,2024-01-15,quintal
+sugarcane,Bangalore Mandi,Karnataka,275,315,295,2024-01-15,quintal

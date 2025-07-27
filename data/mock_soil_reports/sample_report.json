@@ -1,0 +1,32 @@
+{
+  "farm_id": "sample_farm_001",
+  "ph_level": 6.8,
+  "nitrogen": 0.045,
+  "phosphorus": 22.5,
+  "potassium": 180.0,
+  "organic_matter": 2.8,
+  "moisture_content": 15.2,
+  "lab_name": "Agricultural Testing Lab Delhi",
+  "report_date": "2024-01-15",
+  "location": {
+    "latitude": 28.6139,
+    "longitude": 77.2090
+  },
+  "additional_parameters": {
+    "sulfur": 12.5,
+    "zinc": 0.8,
+    "iron": 4.2,
+    "manganese": 2.1,
+    "copper": 0.3,
+    "boron": 0.5
+  },
+  "soil_texture": "loamy",
+  "electrical_conductivity": 0.4,
+  "cation_exchange_capacity": 18.5,
+  "recommendations": [
+    "Apply 50 kg/ha of urea for nitrogen supplementation",
+    "Maintain current phosphorus levels with regular monitoring",
+    "Consider potassium application during flowering stage",
+    "Add organic compost to improve soil structure"
+  ]
+}

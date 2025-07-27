@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  agribotx-app:
+    build: .
+    container_name: agribotx_pro
+    ports:
+      - "7860:7860"
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://agribotx_user:agribotx_password@postgres:5432/agribotx_pro
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
+      - SENTINELHUB_CLIENT_ID=${SENTINELHUB_CLIENT_ID}
+      - SENTINELHUB_CLIENT_SECRET=${SENTINELHUB_CLIENT_SECRET}
+      - AGMARKNET_API_KEY=${AGMARKNET_API_KEY}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      - TWILIO_PHONE_NUMBER=${TWILIO_PHONE_NUMBER}
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./logs:/app/logs
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    networks:
+      - agribotx-network
+
+  postgres:
+    image: postgis/postgis:15-3.3
+    container_name: agribotx_postgres
+    environment:
+      - POSTGRES_DB=agribotx_pro
+      - POSTGRES_USER=agribotx_user
+      - POSTGRES_PASSWORD=agribotx_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/postgres_schema.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - agribotx-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: agribotx_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - agribotx-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: agribotx_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - agribotx-app
+    restart: unless-stopped
+    networks:
+      - agribotx-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  agribotx-network:
+    driver: bridge
