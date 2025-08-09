@@ -8,10 +8,11 @@ Base = declarative_base()
 class Farm(Base):
     __tablename__ = 'farms'
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String(255), nullable=False)
     owner_name = Column(String(255), nullable=False)
-    location = Column(Geometry('POINT', srid=4326), nullable=False)
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
     area_hectares = Column(Float, nullable=False)
     soil_type = Column(String(100))
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -20,8 +21,8 @@ class Farm(Base):
 class SoilReport(Base):
     __tablename__ = 'soil_reports'
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    farm_id = Column(UUID(as_uuid=True), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    farm_id = Column(String(36), nullable=False)
     ph_level = Column(Float)
     nitrogen = Column(Float)  # percentage
     phosphorus = Column(Float)  # ppm
@@ -36,8 +37,8 @@ class SoilReport(Base):
 class CropRecommendation(Base):
     __tablename__ = 'crop_recommendations'
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    farm_id = Column(UUID(as_uuid=True), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    farm_id = Column(String(36), nullable=False)
     recommended_crops = Column(JSON, nullable=False)  # List of crop recommendations
     confidence_score = Column(Float)
     reasoning = Column(Text)
@@ -48,8 +49,8 @@ class CropRecommendation(Base):
 class DiseaseDetection(Base):
     __tablename__ = 'disease_detections'
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    farm_id = Column(UUID(as_uuid=True), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    farm_id = Column(String(36), nullable=False)
     image_path = Column(String(500), nullable=False)
     crop_type = Column(String(100), nullable=False)
     detected_disease = Column(String(255))
