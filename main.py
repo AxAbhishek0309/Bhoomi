@@ -34,7 +34,7 @@ Examples:
     
     parser.add_argument(
         '--mode', 
-        choices=['cli', 'web', 'init', 'agent'],
+        choices=['cli', 'web', 'init', 'agent', 'check-apis'],
         default='cli',
         help='Operation mode (default: cli)'
     )
@@ -102,6 +102,9 @@ Examples:
         elif args.mode == 'agent':
             return run_single_agent(args)
         
+        elif args.mode == 'check-apis':
+            return check_api_status()
+        
         else:
             parser.print_help()
             return 1
@@ -136,34 +139,53 @@ def print_banner():
 def check_environment():
     """Check if environment is properly configured"""
     required_vars = ['OPENAI_API_KEY']
-    optional_vars = [
+    recommended_vars = [
         'OPENWEATHER_API_KEY',
         'SENTINELHUB_CLIENT_ID',
-        'AGMARKNET_API_KEY',
+        'AGMARKNET_API_KEY'
+    ]
+    optional_vars = [
         'TWILIO_ACCOUNT_SID',
         'DATABASE_URL'
     ]
     
     missing_required = []
+    missing_recommended = []
     missing_optional = []
     
     for var in required_vars:
         if not os.getenv(var):
             missing_required.append(var)
     
+    for var in recommended_vars:
+        if not os.getenv(var):
+            missing_recommended.append(var)
+    
     for var in optional_vars:
         if not os.getenv(var):
             missing_optional.append(var)
     
     if missing_required:
-        print(f"❌ Missing required environment variables: {', '.join(missing_required)}")
+        print(f"❌ Missing REQUIRED environment variables: {', '.join(missing_required)}")
+        print("\n🔧 Setup Instructions:")
+        print("1. Get OpenAI API key from: https://platform.openai.com/api-keys")
+        print("2. Copy .env.example to .env and add your keys")
         return False
     
-    if missing_optional:
-        print(f"⚠️  Missing optional environment variables: {', '.join(missing_optional)}")
-        print("   Some features may not work properly.")
+    if missing_recommended:
+        print(f"⚠️  Missing RECOMMENDED API keys: {', '.join(missing_recommended)}")
+        print("\n🔧 For full functionality, get these FREE API keys:")
+        print("• OpenWeatherMap: https://openweathermap.org/api")
+        print("• SentinelHub: https://www.sentinel-hub.com/ (free tier)")
+        print("• Agmarknet: https://data.gov.in/ (Indian government data)")
+        print("\n✅ System will work with fallback APIs, but live data is recommended!")
     
-    print("✅ Environment configuration looks good!")
+    if missing_optional:
+        print(f"ℹ️  Optional features disabled: {', '.join(missing_optional)}")
+    
+    if not missing_required and not missing_recommended:
+        print("✅ All APIs configured! You'll get the best live data experience.")
+    
     return True
 
 def initialize_system():
@@ -446,6 +468,37 @@ def run_market_agent(crop_type):
         
     except Exception as e:
         print(f"❌ Market agent error: {e}")
+        return 1
+
+def check_api_status():
+    """Check the status of all external APIs"""
+    print("🔍 Checking API connectivity...")
+    
+    try:
+        from utils.api_status import APIStatusChecker
+        
+        checker = APIStatusChecker()
+        statuses = asyncio.run(checker.check_all_apis())
+        report = checker.generate_status_report(statuses)
+        
+        print(report)
+        
+        # Return appropriate exit code
+        online_count = sum(1 for s in statuses.values() if s.status == 'online')
+        total_count = len(statuses)
+        
+        if online_count == total_count:
+            print("🎉 All APIs are working perfectly!")
+            return 0
+        elif online_count >= total_count * 0.5:
+            print("⚠️  Some APIs are offline, but core functionality should work.")
+            return 0
+        else:
+            print("❌ Most APIs are offline. Please check your configuration.")
+            return 1
+            
+    except Exception as e:
+        print(f"❌ Error checking API status: {e}")
         return 1
 
 if __name__ == "__main__":

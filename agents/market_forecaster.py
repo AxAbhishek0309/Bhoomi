@@ -51,16 +51,14 @@ class MarketForecastAgent:
     
     def __init__(self, config: Dict[str, Any]):
         self.config = config
-        self.api_endpoints = config.get('api_endpoints', {})
-        self.agmarknet_api = self.api_endpoints.get('agmarknet')
-        self.backup_csv = self.api_endpoints.get('backup_csv', 'data/fallback_prices.csv')
         self.price_trend_days = config.get('price_trend_days', 30)
         self.supported_markets = config.get('supported_markets', [
             'delhi', 'mumbai', 'kolkata', 'chennai', 'bangalore'
         ])
         
-        # API key for Agmarknet
-        self.api_key = os.getenv('AGMARKNET_API_KEY')
+        # Initialize web scraper (no API key needed)
+        from utils.agmarknet_scraper import AgmarknetScraper
+        self.agmarknet_scraper = AgmarknetScraper()
         
         # Crop-market mapping
         self.crop_market_mapping = {
@@ -75,7 +73,7 @@ class MarketForecastAgent:
     
     async def get_current_prices(self, crop_name: str, markets: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """
-        Fetch current market prices for a specific crop
+        Fetch current market prices for a specific crop - LIVE DATA ONLY
         
         Args:
             crop_name: Name of the crop
@@ -84,63 +82,120 @@ class MarketForecastAgent:
         Returns:
             List of current price data
         """
+        if markets is None:
+            markets = self.crop_market_mapping.get(crop_name, self.supported_markets)
+        
+        current_prices = []
+        
+        # Try web scraping first (no API key needed)
         try:
-            if markets is None:
-                markets = self.crop_market_mapping.get(crop_name, self.supported_markets)
-            
-            current_prices = []
-            
-            # Try to fetch from Agmarknet API
-            if self.api_key and self.agmarknet_api:
-                api_prices = await self._fetch_from_agmarknet_api(crop_name, markets)
+            logger.info(f"Scraping Agmarknet for {crop_name} prices")
+            scraped_prices = await self.agmarknet_scraper.get_crop_prices(crop_name, markets)
+            if scraped_prices and len(scraped_prices) > 0:
+                logger.info(f"Successfully scraped {len(scraped_prices)} price records from Agmarknet")
+                current_prices.extend(scraped_prices)
+            else:
+                logger.warning("Agmarknet scraper returned no price data")
+        except Exception as e:
+            logger.error(f"Error with Agmarknet scraper: {e}")
+        
+        # Try alternative data sources if scraping fails
+        if not current_prices:
+            try:
+                logger.info("Trying data.gov.in as fallback")
+                api_prices = await self._fetch_from_data_gov_in(crop_name, markets)
                 if api_prices:
                     current_prices.extend(api_prices)
-            
-            # Fallback to CSV data if API fails
-            if not current_prices:
-                csv_prices = await self._fetch_from_csv_fallback(crop_name, markets)
-                current_prices.extend(csv_prices)
-            
-            return current_prices
-            
-        except Exception as e:
-            logger.error(f"Error fetching current prices: {e}")
-            return []
+            except Exception as e:
+                logger.error(f"Error with data.gov.in: {e}")
+        
+        if not current_prices:
+            raise Exception(f"All market price sources failed for {crop_name}. Please check:\n"
+                           f"1. Network connection\n"
+                           f"2. Crop name spelling: {crop_name}\n"
+                           f"3. Agmarknet website accessibility\n"
+                           f"Available markets: {markets}")
+        
+        return current_prices
     
-    async def _fetch_from_agmarknet_api(self, crop_name: str, markets: List[str]) -> List[Dict[str, Any]]:
-        """Fetch prices from Agmarknet API"""
+
+    
+    async def _fetch_from_data_gov_in(self, crop_name: str, markets: List[str]) -> List[Dict[str, Any]]:
+        """Fetch prices from data.gov.in open data portal"""
         try:
             prices = []
             
+            # data.gov.in has multiple agricultural datasets
+            # Using the general commodity price dataset
+            base_url = "https://api.data.gov.in/resource/35985678-0d79-46b4-9ed6-6f13308a1d24"
+            
             for market in markets:
-                # Construct API URL
-                url = f"{self.agmarknet_api}?api-key={self.api_key}&format=json&limit=100"
-                url += f"&filters[commodity]={crop_name}&filters[market]={market}"
+                params = {
+                    'api-key': self.api_key or 'YOUR_API_KEY',
+                    'format': 'json',
+                    'limit': 100,
+                    'filters[commodity]': crop_name.lower(),
+                    'filters[market]': market.lower()
+                }
                 
-                response = requests.get(url, timeout=10)
-                response.raise_for_status()
-                
-                data = response.json()
-                
-                if 'records' in data:
-                    for record in data['records']:
-                        price_data = {
-                            'crop_name': crop_name,
-                            'market_name': record.get('market', market),
-                            'state': record.get('state', ''),
-                            'min_price': float(record.get('min_price', 0)),
-                            'max_price': float(record.get('max_price', 0)),
-                            'modal_price': float(record.get('modal_price', 0)),
-                            'price_date': datetime.strptime(record.get('price_date', ''), '%Y-%m-%d'),
-                            'unit': record.get('unit', 'quintal'),
-                            'source': 'agmarknet_api'
-                        }
-                        prices.append(price_data)
+                response = requests.get(base_url, params=params, timeout=10)
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    if 'records' in data:
+                        for record in data['records']:
+                            price_data = {
+                                'crop_name': crop_name,
+                                'market_name': record.get('market', market),
+                                'state': record.get('state', ''),
+                                'min_price': float(record.get('min_price', 0)),
+                                'max_price': float(record.get('max_price', 0)),
+                                'modal_price': float(record.get('modal_price', 0)),
+                                'price_date': datetime.strptime(record.get('price_date', ''), '%Y-%m-%d') if record.get('price_date') else datetime.now(),
+                                'unit': record.get('unit', 'quintal'),
+                                'source': 'data_gov_in'
+                            }
+                            prices.append(price_data)
             
             return prices
             
         except Exception as e:
-            logger.error(f"Error fetching from Agmarknet API: {e}")
+            logger.error(f"Error fetching from data.gov.in: {e}")
+            return []
+    
+    async def _fetch_from_ncdex_api(self, crop_name: str, markets: List[str]) -> List[Dict[str, Any]]:
+        """Fetch prices from NCDEX (National Commodity & Derivatives Exchange)"""
+        try:
+            prices = []
+            
+            # NCDEX provides commodity futures and spot prices
+            # This is a simplified implementation - actual NCDEX API requires registration
+            
+            # Map crop names to NCDEX commodity codes
+            ncdex_commodity_map = {
+                'wheat': 'WHEAT',
+                'rice': 'PADDY',
+                'cotton': 'COTTON',
+                'soybean': 'SOYBEAN',
+                'corn': 'MAIZE',
+                'turmeric': 'TURMERIC',
+                'coriander': 'CORIANDER'
+            }
+            
+            commodity_code = ncdex_commodity_map.get(crop_name.lower())
+            if not commodity_code:
+                return []
+            
+            # Simulate NCDEX data structure
+            for market in markets:
+                # In real implementation, you'd call NCDEX API here
+                # For now, we'll return empty to force fallback to other APIs
+                pass
+            
+            return prices
+            
+        except Exception as e:
+            logger.error(f"Error fetching from NCDEX: {e}")
             return []
     
     async def _fetch_from_csv_fallback(self, crop_name: str, markets: List[str]) -> List[Dict[str, Any]]:
@@ -179,51 +234,23 @@ class MarketForecastAgent:
             logger.error(f"Error fetching from CSV fallback: {e}")
             return []
     
-    async def _create_sample_price_data(self):
-        """Create sample price data for testing"""
+    def get_market_api_status(self) -> Dict[str, str]:
+        """Get status of all market data sources"""
+        status = {}
+        
+        # Check Agmarknet scraper
         try:
-            # Create data directory if it doesn't exist
-            os.makedirs(os.path.dirname(self.backup_csv), exist_ok=True)
-            
-            # Generate sample data
-            crops = ['wheat', 'rice', 'tomato', 'onion', 'potato']
-            markets = ['delhi', 'mumbai', 'kolkata', 'chennai', 'bangalore']
-            
-            sample_data = []
-            base_date = datetime.now() - timedelta(days=30)
-            
-            for crop in crops:
-                base_price = np.random.randint(1000, 3000)
-                
-                for market in markets:
-                    for day in range(30):
-                        date = base_date + timedelta(days=day)
-                        
-                        # Add some price variation
-                        price_variation = np.random.normal(0, 100)
-                        modal_price = max(500, base_price + price_variation)
-                        min_price = modal_price * 0.9
-                        max_price = modal_price * 1.1
-                        
-                        sample_data.append({
-                            'crop_name': crop,
-                            'market_name': market,
-                            'state': market.title(),
-                            'min_price': min_price,
-                            'max_price': max_price,
-                            'modal_price': modal_price,
-                            'price_date': date.strftime('%Y-%m-%d'),
-                            'unit': 'quintal'
-                        })
-            
-            # Save to CSV
-            df = pd.DataFrame(sample_data)
-            df.to_csv(self.backup_csv, index=False)
-            
-            logger.info(f"Created sample price data at {self.backup_csv}")
-            
-        except Exception as e:
-            logger.error(f"Error creating sample price data: {e}")
+            if self.agmarknet_scraper.test_connection():
+                status['agmarknet_scraper'] = 'Available - web scraping (no API key needed)'
+            else:
+                status['agmarknet_scraper'] = 'Offline - website not accessible'
+        except:
+            status['agmarknet_scraper'] = 'Error - scraper not initialized'
+        
+        # data.gov.in
+        status['data_gov_in'] = 'Available - open government data portal'
+        
+        return status
     
     async def forecast_prices(self, crop_name: str, market_name: str, 
                             forecast_days: int = 30, session: Optional[Session] = None) -> PriceForecast:

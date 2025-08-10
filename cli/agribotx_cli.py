@@ -590,5 +590,59 @@ def status():
     except Exception as e:
         console.print(f"[red]Error checking status: {e}[/red]")
 
+@cli.command()
+def api_status():
+    """Check live API connectivity and status"""
+    console.print(Panel.fit("🔍 Live API Status Check", style="bold blue"))
+    
+    try:
+        from utils.api_status import APIStatusChecker
+        
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            task = progress.add_task("Checking all APIs...", total=None)
+            
+            checker = APIStatusChecker()
+            statuses = asyncio.run(checker.check_all_apis())
+            
+            progress.update(task, completed=True)
+        
+        # Display detailed API status
+        api_table = Table(title="Live API Status")
+        api_table.add_column("API", style="cyan")
+        api_table.add_column("Status", style="green")
+        api_table.add_column("Response Time", style="yellow")
+        api_table.add_column("Notes", style="blue")
+        
+        for api_name, status in statuses.items():
+            status_icon = {
+                'online': '✅ Online',
+                'offline': '❌ Offline',
+                'error': '⚠️ Error',
+                'no_key': '🔑 No Key'
+            }.get(status.status, '❓ Unknown')
+            
+            response_time = f"{status.response_time_ms:.0f}ms" if status.response_time_ms > 0 else "N/A"
+            notes = status.error_message[:30] + "..." if status.error_message else "OK"
+            
+            api_table.add_row(status.name, status_icon, response_time, notes)
+        
+        console.print(api_table)
+        
+        # Summary
+        online_count = sum(1 for s in statuses.values() if s.status == 'online')
+        total_count = len(statuses)
+        
+        if online_count == total_count:
+            console.print(Panel("🎉 All APIs are operational!", style="green"))
+        else:
+            console.print(Panel(f"⚠️ {online_count}/{total_count} APIs online. Check configuration for offline APIs.", style="yellow"))
+        
+    except Exception as e:
+        console.print(f"[red]Error checking API status: {e}[/red]")
+
 if __name__ == '__main__':
     cli()

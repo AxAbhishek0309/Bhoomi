@@ -116,6 +116,9 @@ class VoiceInterfaceAgent:
                 'दिल्ली', 'मुंबई', 'कोलकाता'  # Hindi
             ]
         }
+        
+        # Note: Voice interface now works with text input and audio file upload
+        # SMS/Twilio integration removed for simplicity
     
     def _load_whisper_model(self):
         """Load Whisper model for speech recognition"""

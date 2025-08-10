@@ -126,15 +126,10 @@ class IrrigationAdvisorAgent:
             
         except Exception as e:
             logger.error(f"Error generating irrigation recommendation: {e}")
-            return IrrigationRecommendation(
-                scheduled_date=datetime.now() + timedelta(days=1),
-                water_amount_liters=1000,
-                irrigation_method="sprinkler",
-                duration_minutes=60,
-                reasoning=f"Error in calculation: {str(e)}",
-                urgency_level="medium",
-                weather_considerations=[]
-            )
+            raise Exception(f"Irrigation recommendation failed: {str(e)}. Please check:\n"
+                           f"1. Weather API connectivity\n"
+                           f"2. Farm data availability\n"
+                           f"3. Network connection")
     
     async def _assess_soil_moisture(self, farm_id: str, session: Session) -> SoilMoistureStatus:
         """Assess current soil moisture status"""

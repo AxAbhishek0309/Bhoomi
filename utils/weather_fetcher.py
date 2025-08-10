@@ -35,6 +35,7 @@ class WeatherFetcher:
         # API endpoints
         self.openweather_base_url = "https://api.openweathermap.org/data/2.5"
         self.nasa_power_base_url = "https://power.larc.nasa.gov/api/temporal/daily/point"
+        self.openmeteo_base_url = "https://api.open-meteo.com/v1"
         
         # Cache for API responses (simple in-memory cache)
         self._cache = {}
@@ -42,7 +43,7 @@ class WeatherFetcher:
     
     async def get_current_weather(self, latitude: float, longitude: float) -> Dict[str, Any]:
         """
-        Get current weather data for a location
+        Get current weather data for a location - LIVE DATA ONLY
         
         Args:
             latitude: Latitude of the location
@@ -51,28 +52,37 @@ class WeatherFetcher:
         Returns:
             Dictionary containing current weather data
         """
-        try:
-            # Try OpenWeatherMap first
-            if self.openweather_api_key:
-                weather_data = await self._fetch_openweather_current(latitude, longitude)
-                if weather_data:
+        # Try multiple real APIs in order of preference
+        apis_to_try = []
+        
+        if self.openweather_api_key:
+            apis_to_try.append(('openweather', self._fetch_openweather_current))
+        
+        # Add Open-Meteo (free, no API key required)
+        apis_to_try.append(('openmeteo', self._fetch_openmeteo_current))
+        
+        # Add NASA POWER as last resort
+        apis_to_try.append(('nasa_power', self._fetch_nasa_power_current))
+        
+        for api_name, fetch_func in apis_to_try:
+            try:
+                logger.info(f"Trying {api_name} API for weather data")
+                weather_data = await fetch_func(latitude, longitude)
+                if weather_data and weather_data.get('temperature') is not None:
+                    logger.info(f"Successfully fetched weather data from {api_name}")
                     return weather_data
-            
-            # Fallback to NASA POWER (historical data as current)
-            weather_data = await self._fetch_nasa_power_current(latitude, longitude)
-            if weather_data:
-                return weather_data
-            
-            # Final fallback - mock data
-            return self._generate_mock_weather_data()
-            
-        except Exception as e:
-            logger.error(f"Error fetching current weather: {e}")
-            return self._generate_mock_weather_data()
+                else:
+                    logger.warning(f"{api_name} returned incomplete data")
+            except Exception as e:
+                logger.error(f"Error with {api_name} API: {e}")
+                continue
+        
+        # If all APIs fail, raise an exception instead of returning mock data
+        raise Exception("All weather APIs failed - no live data available. Please check API keys and network connection.")
     
     async def get_forecast(self, latitude: float, longitude: float, days: int = 7) -> Dict[str, Any]:
         """
-        Get weather forecast for a location
+        Get weather forecast for a location - LIVE DATA ONLY
         
         Args:
             latitude: Latitude of the location
@@ -82,24 +92,30 @@ class WeatherFetcher:
         Returns:
             Dictionary containing forecast data
         """
-        try:
-            # Try OpenWeatherMap forecast
-            if self.openweather_api_key:
-                forecast_data = await self._fetch_openweather_forecast(latitude, longitude, days)
-                if forecast_data:
+        # Try multiple real APIs in order of preference
+        apis_to_try = []
+        
+        if self.openweather_api_key:
+            apis_to_try.append(('openweather', self._fetch_openweather_forecast))
+        
+        # Add Open-Meteo (free, no API key required)
+        apis_to_try.append(('openmeteo', self._fetch_openmeteo_forecast))
+        
+        for api_name, fetch_func in apis_to_try:
+            try:
+                logger.info(f"Trying {api_name} API for forecast data")
+                forecast_data = await fetch_func(latitude, longitude, days)
+                if forecast_data and forecast_data.get('daily'):
+                    logger.info(f"Successfully fetched forecast from {api_name}")
                     return forecast_data
-            
-            # Fallback to NASA POWER historical patterns
-            forecast_data = await self._fetch_nasa_power_forecast(latitude, longitude, days)
-            if forecast_data:
-                return forecast_data
-            
-            # Final fallback - mock forecast
-            return self._generate_mock_forecast_data(days)
-            
-        except Exception as e:
-            logger.error(f"Error fetching weather forecast: {e}")
-            return self._generate_mock_forecast_data(days)
+                else:
+                    logger.warning(f"{api_name} returned incomplete forecast data")
+            except Exception as e:
+                logger.error(f"Error with {api_name} forecast API: {e}")
+                continue
+        
+        # If all APIs fail, raise an exception
+        raise Exception("All weather forecast APIs failed - no live data available. Please check API keys and network connection.")
     
     async def get_historical_weather(self, latitude: float, longitude: float,
                                    start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
@@ -253,6 +269,72 @@ class WeatherFetcher:
             logger.error(f"Error fetching OpenWeatherMap forecast: {e}")
             return None
     
+    async def _fetch_openmeteo_forecast(self, latitude: float, longitude: float, 
+                                      days: int) -> Optional[Dict[str, Any]]:
+        """Fetch weather forecast from Open-Meteo API (free, no API key required)"""
+        try:
+            cache_key = f"openmeteo_forecast_{latitude}_{longitude}_{days}"
+            
+            # Check cache
+            if self._is_cached(cache_key):
+                return self._cache[cache_key]['data']
+            
+            url = f"{self.openmeteo_base_url}/forecast"
+            params = {
+                'latitude': latitude,
+                'longitude': longitude,
+                'daily': 'temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,relative_humidity_2m_mean',
+                'timezone': 'auto',
+                'forecast_days': min(days, 16)  # Open-Meteo supports up to 16 days
+            }
+            
+            response = requests.get(url, params=params, timeout=15)
+            response.raise_for_status()
+            
+            data = response.json()
+            daily_data = data.get('daily', {})
+            
+            if not daily_data:
+                return None
+            
+            # Parse daily forecasts
+            daily_forecasts = []
+            dates = daily_data.get('time', [])
+            temp_max = daily_data.get('temperature_2m_max', [])
+            temp_min = daily_data.get('temperature_2m_min', [])
+            precipitation = daily_data.get('precipitation_sum', [])
+            wind_speed = daily_data.get('wind_speed_10m_max', [])
+            humidity = daily_data.get('relative_humidity_2m_mean', [])
+            
+            for i in range(min(len(dates), days)):
+                daily_forecasts.append({
+                    'date': dates[i],
+                    'temperature_min': temp_min[i] if i < len(temp_min) else 15,
+                    'temperature_max': temp_max[i] if i < len(temp_max) else 25,
+                    'temperature_avg': (temp_max[i] + temp_min[i]) / 2 if i < len(temp_max) and i < len(temp_min) else 20,
+                    'humidity_avg': humidity[i] if i < len(humidity) else 60,
+                    'precipitation': precipitation[i] if i < len(precipitation) else 0,
+                    'wind_speed_avg': wind_speed[i] if i < len(wind_speed) else 5
+                })
+            
+            forecast_result = {
+                'daily': daily_forecasts,
+                'source': 'openmeteo',
+                'generated_at': datetime.now()
+            }
+            
+            # Cache the result
+            self._cache[cache_key] = {
+                'data': forecast_result,
+                'timestamp': datetime.now()
+            }
+            
+            return forecast_result
+            
+        except Exception as e:
+            logger.error(f"Error fetching Open-Meteo forecast: {e}")
+            return None
+    
     def _aggregate_daily_forecast(self, daily_data: Dict[str, Any]) -> Dict[str, Any]:
         """Aggregate 3-hourly forecast data into daily summary"""
         return {
@@ -266,6 +348,53 @@ class WeatherFetcher:
             'pressure_avg': sum(daily_data['pressure']) / len(daily_data['pressure'])
         }
     
+    async def _fetch_openmeteo_current(self, latitude: float, longitude: float) -> Optional[Dict[str, Any]]:
+        """Fetch current weather from Open-Meteo API (free, no API key required)"""
+        try:
+            cache_key = f"openmeteo_current_{latitude}_{longitude}"
+            
+            # Check cache
+            if self._is_cached(cache_key):
+                return self._cache[cache_key]['data']
+            
+            url = f"{self.openmeteo_base_url}/forecast"
+            params = {
+                'latitude': latitude,
+                'longitude': longitude,
+                'current': 'temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,surface_pressure',
+                'timezone': 'auto'
+            }
+            
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            
+            data = response.json()
+            current = data.get('current', {})
+            
+            weather_data = {
+                'temperature': current.get('temperature_2m', 20),
+                'humidity': current.get('relative_humidity_2m', 60),
+                'rainfall': current.get('precipitation', 0),
+                'wind_speed': current.get('wind_speed_10m', 5),
+                'pressure': current.get('surface_pressure', 1013),
+                'uv_index': None,
+                'description': 'Open-Meteo live data',
+                'source': 'openmeteo',
+                'timestamp': datetime.now()
+            }
+            
+            # Cache the result
+            self._cache[cache_key] = {
+                'data': weather_data,
+                'timestamp': datetime.now()
+            }
+            
+            return weather_data
+            
+        except Exception as e:
+            logger.error(f"Error fetching Open-Meteo current data: {e}")
+            return None
+
     async def _fetch_nasa_power_current(self, latitude: float, longitude: float) -> Optional[Dict[str, Any]]:
         """Fetch current weather from NASA POWER API (using recent historical data)"""
         try:
@@ -413,69 +542,28 @@ class WeatherFetcher:
         
         return None
     
-    def _generate_mock_weather_data(self) -> Dict[str, Any]:
-        """Generate mock weather data as fallback"""
-        import random
-        
-        return {
-            'temperature': random.uniform(15, 35),
-            'humidity': random.uniform(40, 80),
-            'rainfall': random.uniform(0, 10),
-            'wind_speed': random.uniform(5, 20),
-            'pressure': random.uniform(1000, 1020),
-            'uv_index': random.uniform(3, 8),
-            'description': 'Mock weather data',
-            'source': 'mock',
-            'timestamp': datetime.now()
-        }
+    def validate_weather_data(self, weather_data: Dict[str, Any]) -> bool:
+        """Validate that weather data contains required fields"""
+        required_fields = ['temperature', 'humidity', 'source', 'timestamp']
+        return all(field in weather_data and weather_data[field] is not None for field in required_fields)
     
-    def _generate_mock_forecast_data(self, days: int) -> Dict[str, Any]:
-        """Generate mock forecast data as fallback"""
-        import random
+    def get_api_status(self) -> Dict[str, str]:
+        """Get status of all weather APIs"""
+        status = {}
         
-        daily_forecasts = []
+        # Check OpenWeatherMap
+        if self.openweather_api_key:
+            status['openweather'] = 'API key configured'
+        else:
+            status['openweather'] = 'No API key - get free key at openweathermap.org'
         
-        for day in range(days):
-            forecast_date = datetime.now() + timedelta(days=day)
-            
-            daily_forecasts.append({
-                'date': forecast_date.date().isoformat(),
-                'temperature_min': random.uniform(10, 20),
-                'temperature_max': random.uniform(25, 35),
-                'temperature_avg': random.uniform(18, 28),
-                'humidity_avg': random.uniform(50, 80),
-                'precipitation': random.uniform(0, 15),
-                'wind_speed_avg': random.uniform(5, 15)
-            })
+        # Open-Meteo is always available (no API key required)
+        status['openmeteo'] = 'Available (no API key required)'
         
-        return {
-            'daily': daily_forecasts,
-            'source': 'mock',
-            'generated_at': datetime.now()
-        }
-    
-    def _generate_mock_historical_data(self, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
-        """Generate mock historical data as fallback"""
-        import random
+        # NASA POWER
+        status['nasa_power'] = 'Available (no API key required, historical data only)'
         
-        historical_data = []
-        current_date = start_date
-        
-        while current_date <= end_date:
-            weather_record = {
-                'date': current_date.date().isoformat(),
-                'temperature': random.uniform(15, 30),
-                'humidity': random.uniform(50, 80),
-                'rainfall': random.uniform(0, 20),
-                'wind_speed': random.uniform(5, 15),
-                'pressure': random.uniform(1005, 1015),
-                'source': 'mock'
-            }
-            
-            historical_data.append(weather_record)
-            current_date += timedelta(days=1)
-        
-        return historical_data
+        return status
     
     def _is_cached(self, cache_key: str) -> bool:
         """Check if data is cached and still valid"""

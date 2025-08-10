@@ -20,7 +20,7 @@ pillow==10.1.0
 matplotlib==3.8.2
 seaborn==0.13.0
 plotly==5.17.0
-twilio==8.10.3
+beautifulsoup4==4.12.2
 python-dotenv==1.0.0
 pydantic==2.5.0
 click==8.1.7
